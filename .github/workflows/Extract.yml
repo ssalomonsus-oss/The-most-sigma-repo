@@ -16,42 +16,43 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Extract ModTemplate zip ONLY
+      - name: Extract ModTemplate 7z ONLY
         run: |
           set -euo pipefail
 
-          ZIP_NAME="ModTemplate.zip"
+          ARCHIVE_NAME="ModTemplate.7z"
 
-          if [ ! -f "$ZIP_NAME" ]; then
-            echo "❌ $ZIP_NAME not found in repo root"
+          if [ ! -f "$ARCHIVE_NAME" ]; then
+            echo "❌ $ARCHIVE_NAME not found in repo root"
             exit 1
           fi
 
-          echo "✅ Found $ZIP_NAME"
+          echo "✅ Found $ARCHIVE_NAME"
 
-          # Create a temp directory to extract safely
+          # Temp directory for safe extraction
           mkdir -p modtemplate_tmp
 
-          unzip -q "$ZIP_NAME" -d modtemplate_tmp
+          # Extract quietly
+          7z x "$ARCHIVE_NAME" -omodtemplate_tmp -y > /dev/null
 
-          # Move extracted contents into repo root
-          # (assumes zip contains a single top-level folder)
+          # Expect exactly one top-level folder
           TOP_DIR=$(find modtemplate_tmp -mindepth 1 -maxdepth 1 -type d | head -n 1)
 
           if [ -z "$TOP_DIR" ]; then
-            echo "❌ No folder found inside zip"
+            echo "❌ No top-level folder found inside 7z"
             exit 1
           fi
 
           echo "📦 Extracting from $TOP_DIR"
 
+          # Move contents only (including dotfiles)
           shopt -s dotglob
           mv "$TOP_DIR"/* .
           shopt -u dotglob
 
           # Cleanup
           rm -rf modtemplate_tmp
-          rm -f "$ZIP_NAME"
+          rm -f "$ARCHIVE_NAME"
 
           echo "✅ ModTemplate extracted into repo root"
 
@@ -62,5 +63,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "Extract ModTemplate zip into repo root" || echo "No changes to commit"
+          git commit -m "Extract ModTemplate 7z into repo root" || echo "No changes to commit"
           git push
