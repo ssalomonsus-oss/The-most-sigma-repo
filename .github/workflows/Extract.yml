@@ -16,36 +16,44 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Find ModTemplate and move its contents to repo root
+      - name: Extract ModTemplate zip ONLY
         run: |
           set -euo pipefail
 
-          # find first ModTemplate (ignore .git)
-          MODDIR=$(find . -type d -name 'ModTemplate' -not -path './.git/*' -print -quit || true)
+          ZIP_NAME="ModTemplate.zip"
 
-          if [ -z "$MODDIR" ]; then
-            echo "No ModTemplate folder found. Exiting."
-            exit 0
+          if [ ! -f "$ZIP_NAME" ]; then
+            echo "❌ $ZIP_NAME not found in repo root"
+            exit 1
           fi
 
-          echo "Found ModTemplate at: $MODDIR"
+          echo "✅ Found $ZIP_NAME"
 
-          # safety: don't try to move if it's the repo root
-          if [ "$MODDIR" = "." ] || [ "$MODDIR" = "./" ]; then
-            echo "ModTemplate is repo root — nothing to move."
-            exit 0
+          # Create a temp directory to extract safely
+          mkdir -p modtemplate_tmp
+
+          unzip -q "$ZIP_NAME" -d modtemplate_tmp
+
+          # Move extracted contents into repo root
+          # (assumes zip contains a single top-level folder)
+          TOP_DIR=$(find modtemplate_tmp -mindepth 1 -maxdepth 1 -type d | head -n 1)
+
+          if [ -z "$TOP_DIR" ]; then
+            echo "❌ No folder found inside zip"
+            exit 1
           fi
 
-          # enable moving dotfiles
-          # move everything (non-dot and dotfiles). suppress errors if pattern empty.
-          shopt -s dotglob || true
-          mv "$MODDIR"/* . 2>/dev/null || true
-          mv "$MODDIR"/.[!.]* . 2>/dev/null || true
+          echo "📦 Extracting from $TOP_DIR"
 
-          # remove the now-empty ModTemplate folder
-          rm -rf "$MODDIR"
+          shopt -s dotglob
+          mv "$TOP_DIR"/* .
+          shopt -u dotglob
 
-          echo "Contents moved to repo root and $MODDIR removed."
+          # Cleanup
+          rm -rf modtemplate_tmp
+          rm -f "$ZIP_NAME"
+
+          echo "✅ ModTemplate extracted into repo root"
 
       - name: Commit & push changes
         env:
@@ -54,5 +62,5 @@ jobs:
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
           git add .
-          git commit -m "Flatten ModTemplate: move its contents into repo root and remove folder" || echo "No changes to commit"
+          git commit -m "Extract ModTemplate zip into repo root" || echo "No changes to commit"
           git push
